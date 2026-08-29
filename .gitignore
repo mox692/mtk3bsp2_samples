@@ -1,0 +1,35 @@
+# Build artifacts
+*.o
+*.d
+*.elf
+*.bin
+*.hex
+*.map
+*.lst
+*.su
+*.idb
+*.bak
+
+# Debug and Release directories
+Debug/
+Release/
+
+# IDE specific files (STM32CubeIDE/Eclipse)
+.settings/
+*.launch
+
+# Compiler and linker generated files
+*.a
+*.lib
+
+# Cache files
+*.cache
+
+# Log files
+*.log
+
+# Temporary files
+*~
+*.swp
+*.swo
+.DS_Store
