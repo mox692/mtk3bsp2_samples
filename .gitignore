@@ -9,10 +9,9 @@
 *.su
 *.idb
 *.bak
+*.list
+*.cyclo
 
-# Debug and Release directories
-Debug/
-Release/
 
 # IDE specific files (STM32CubeIDE/Eclipse)
 .settings/

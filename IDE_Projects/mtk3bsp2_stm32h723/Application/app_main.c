@@ -1,6 +1,9 @@
 #include <tk/tkernel.h>
 #include <tm/tmonitor.h>
 
+/* Rust function declaration */
+extern void rust_hello(void);
+
 LOCAL void task_1(INT stacd, void *exinf);	// task execution function
 LOCAL ID	tskid_1;			// Task ID number
 LOCAL T_CTSK ctsk_1 = {				// Task creation information
@@ -36,6 +39,10 @@ LOCAL void task_2(INT stacd, void *exinf)
 {
 	while(1) {
 		tm_printf((UB*)"task 2\n");
+
+		/* Call Rust function */
+		rust_hello();
+
 		tk_dly_tsk(700);
 	}
 }
