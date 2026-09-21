@@ -127,15 +127,14 @@ LOCAL void can1_init(void)
 	/* 4. Bit timing: 500 kbps */
 	out_w(FDCAN_NBTP, FDCAN_NBTP_500K_8MHZ);
 
-	/* 5. Reject every frame that does not match the standard filter list */
-	out_w(FDCAN_GFC, (3u << 4) | (3u << 2));	/* ANFS=reject, ANFE=reject */
+	/* 5. Accept-all: route every non-matching frame into RX FIFO0.        */
+	/*    GFC.ANFS (bits[5:4]) / ANFE (bits[3:2]) = 00 -> accept into FIFO0.*/
+	/*    RRFS (bit0) / RRFE (bit1) = 0 -> also accept remote frames.      */
+	/*    (Was (3<<4)|(3<<2) = reject-all, which only let ID 0x123 in.)    */
+	out_w(FDCAN_GFC, 0u);
 
-	/* 6. Standard ID filter list: 1 element at offset 0 */
-	out_w(FDCAN_SIDFC, (1u << 16) | SRAMCAN_FLS_OFFSET);
-	/* Classic filter (SFT=10), store matches in RX FIFO0 (SFEC=001),        */
-	/* SFID1 = ID, SFID2 = mask 0x7FF (exact match).                         */
-	out_w(SRAMCAN_BASE_ADDR + SRAMCAN_FLS_OFFSET,
-	      (2u << 30) | (1u << 27) | (CAN_TEST_ID << 16) | 0x7FFu);
+	/* 6. No standard ID filter list needed while accepting all frames.    */
+	out_w(FDCAN_SIDFC, 0u);
 
 	/* 7. RX FIFO0: CAN_RX_FIFO_SIZE elements, 8-byte data section.        */
 	/*    RXF0C: F0S (FIFO0 size) is bits[22:16], F0SA is the start addr.  */
