@@ -51,6 +51,8 @@ extern void rust_hello(void);
 #define FDCAN_TXFQS		(FDCAN1_BASE_ADDR + 0x0C4u)
 #define FDCAN_TXESC		(FDCAN1_BASE_ADDR + 0x0C8u)
 #define FDCAN_TXBAR		(FDCAN1_BASE_ADDR + 0x0D0u)
+#define FDCAN_IR		(FDCAN1_BASE_ADDR + 0x050u)	/* Interrupt register  */
+#define FDCAN_IR_RF0L		(1u << 3)	/* RX FIFO0 message lost (overflow) */
 
 #define FDCAN_CCU_CCFG		(FDCAN_CCU_BASE_ADDR + 0x004u)
 #define FDCANCCU_CCFG_BCC	(1u << 6)	/* Bypass clock calibration */
@@ -60,9 +62,22 @@ extern void rust_hello(void);
 
 /* --- Message RAM layout (byte offsets from SRAMCAN base) ---            */
 /*  registers store the start address as a word-aligned byte offset.      */
+/*                                                                        */
+/*  Classic CAN, 8-byte payload => 8-byte header + 8-byte data = 16 B/el. */
+/*    Std ID filter : 0x000-0x003  (1 element  x  4B  =   4 B)            */
+/*    RX FIFO0      : 0x040-0x13F  (16 elements x 16B  = 256 B)           */
+/*    TX FIFO       : 0x140-0x1BF  ( 8 elements x 16B  = 128 B)           */
+/*  Ends at 0x1C0 (448B), well within the shared 10KB message RAM.        */
+/*  NOTE: this RAM is shared across FDCAN instances; if FDCAN2 is enabled */
+/*  later, its regions must not overlap these offsets.                    */
+#define CAN_RX_FIFO_SIZE	16u	/* # of RX FIFO0 elements */
+#define CAN_TX_FIFO_SIZE	8u	/* # of TX FIFO elements  */
+#define CAN_ELEMENT_SIZE	16u	/* header(8) + data(8) bytes/element */
+
 #define SRAMCAN_FLS_OFFSET	0x000u	/* 11-bit filter list : 1 element (4B) */
-#define SRAMCAN_RXF0_OFFSET	0x040u	/* RX FIFO0           : 1 element (16B) */
-#define SRAMCAN_TXB_OFFSET	0x080u	/* TX buffer/FIFO     : 1 element (16B) */
+#define SRAMCAN_RXF0_OFFSET	0x040u	/* RX FIFO0                            */
+#define SRAMCAN_TXB_OFFSET	(SRAMCAN_RXF0_OFFSET + \
+				 CAN_RX_FIFO_SIZE * CAN_ELEMENT_SIZE) /* TX FIFO */
 
 #define CAN_TEST_ID		0x123u	/* Standard ID used for both TX and RX */
 
@@ -112,23 +127,27 @@ LOCAL void can1_init(void)
 	/* 4. Bit timing: 500 kbps */
 	out_w(FDCAN_NBTP, FDCAN_NBTP_500K_8MHZ);
 
-	/* 5. Reject every frame that does not match the standard filter list */
-	out_w(FDCAN_GFC, (3u << 4) | (3u << 2));	/* ANFS=reject, ANFE=reject */
+	/* 5. Accept-all: route every non-matching frame into RX FIFO0.        */
+	/*    GFC.ANFS (bits[5:4]) / ANFE (bits[3:2]) = 00 -> accept into FIFO0.*/
+	/*    RRFS (bit0) / RRFE (bit1) = 0 -> also accept remote frames.      */
+	/*    (Was (3<<4)|(3<<2) = reject-all, which only let ID 0x123 in.)    */
+	out_w(FDCAN_GFC, 0u);
 
-	/* 6. Standard ID filter list: 1 element at offset 0 */
-	out_w(FDCAN_SIDFC, (1u << 16) | SRAMCAN_FLS_OFFSET);
-	/* Classic filter (SFT=10), store matches in RX FIFO0 (SFEC=001),        */
-	/* SFID1 = ID, SFID2 = mask 0x7FF (exact match).                         */
-	out_w(SRAMCAN_BASE_ADDR + SRAMCAN_FLS_OFFSET,
-	      (2u << 30) | (1u << 27) | (CAN_TEST_ID << 16) | 0x7FFu);
+	/* 6. No standard ID filter list needed while accepting all frames.    */
+	out_w(FDCAN_SIDFC, 0u);
 
-	/* 7. RX FIFO0: 1 element, 8-byte data section (RXESC F0DS=0) */
-	out_w(FDCAN_RXF0C, (1u << 16) | SRAMCAN_RXF0_OFFSET);
-	out_w(FDCAN_RXESC, 0u);
+	/* 7. RX FIFO0: CAN_RX_FIFO_SIZE elements, 8-byte data section.        */
+	/*    RXF0C: F0S (FIFO0 size) is bits[22:16], F0SA is the start addr.  */
+	out_w(FDCAN_RXF0C, (CAN_RX_FIFO_SIZE << 16) | SRAMCAN_RXF0_OFFSET);
+	out_w(FDCAN_RXESC, 0u);	/* F0DS=0 -> 8-byte data field */
 
-	/* 8. TX buffer (FIFO mode): 1 element, 8-byte data section (TXESC TBDS=0) */
-	out_w(FDCAN_TXBC, (1u << 16) | SRAMCAN_TXB_OFFSET);
-	out_w(FDCAN_TXESC, 0u);
+	/* 8. TX FIFO: CAN_TX_FIFO_SIZE elements, 8-byte data section.         */
+	/*    TXBC: NDTB (dedicated buffers) is bits[21:16], TFQS (FIFO/queue  */
+	/*    size) is bits[29:24], TFQM (bit30) selects FIFO(0)/queue(1) mode.*/
+	/*    We want a TX FIFO, so the size MUST go in TFQS (<<24), not NDTB. */
+	/*    (Previously (1u<<16) wrongly set 1 dedicated buffer + 0 FIFO.)   */
+	out_w(FDCAN_TXBC, (CAN_TX_FIFO_SIZE << 24) | SRAMCAN_TXB_OFFSET);
+	out_w(FDCAN_TXESC, 0u);	/* TBDS=0 -> 8-byte data field */
 
 	/* 9. Leave INIT -> Normal mode */
 	out_w(FDCAN_CCCR, in_w(FDCAN_CCCR) & ~(FDCAN_CCCR_CCE | FDCAN_CCCR_INIT));
@@ -137,13 +156,31 @@ LOCAL void can1_init(void)
 
 /* ------------------------------------------------------------------------ */
 /*  Send one Classic CAN frame (Standard ID, up to 8 bytes)                 */
+/*                                                                          */
+/*  Returns 1 if the frame was queued, 0 if the TX FIFO was full.           */
+/*  A return of 1 means "queued", not "already transmitted on the bus".     */
+/*  Assumes a single task drives the TX FIFO; concurrent callers would      */
+/*  need external synchronization.                                          */
 /* ------------------------------------------------------------------------ */
-LOCAL void can1_send(UW id, const UB *data, UW dlc)
+LOCAL INT can1_send(UW id, const UB *data, UW dlc)
 {
 	UW txfqs = in_w(FDCAN_TXFQS);
-	UW pidx  = (txfqs >> 16) & 0x1Fu;			/* TFQPI: put index */
-	UW elem  = SRAMCAN_BASE_ADDR + SRAMCAN_TXB_OFFSET + pidx * 16u;
+	UW pidx;
+	UW elem;
 	UW t1;
+
+	/* Bail out if the TX FIFO is full: TFQF (bit21) set, or TFFL (free    */
+	/* level, bits[5:0]) == 0. Writing anyway would clobber a pending frame*/
+	/* and is a likely cause of "TX sometimes stops" symptoms.             */
+	if ((txfqs & (1u << 21)) != 0) {
+		return 0;
+	}
+	if ((txfqs & 0x3Fu) == 0) {
+		return 0;
+	}
+
+	pidx = (txfqs >> 16) & 0x1Fu;			/* TFQPI: put index */
+	elem = SRAMCAN_BASE_ADDR + SRAMCAN_TXB_OFFSET + pidx * CAN_ELEMENT_SIZE;
 
 	if (dlc > 8) dlc = 8;
 
@@ -167,6 +204,20 @@ LOCAL void can1_send(UW id, const UB *data, UW dlc)
 
 	/* Request transmission of this buffer */
 	out_w(FDCAN_TXBAR, (1u << pidx));
+
+	return 1;
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Report (and clear) an RX FIFO0 message-loss/overflow event.             */
+/*  RF0L only signals that >=1 frame was dropped, not how many.             */
+/* ------------------------------------------------------------------------ */
+LOCAL void can1_check_rx_overflow(void)
+{
+	if ((in_w(FDCAN_IR) & FDCAN_IR_RF0L) != 0) {
+		tm_printf((UB*)"CAN RX FIFO OVERFLOW!\n");
+		out_w(FDCAN_IR, FDCAN_IR_RF0L);	/* clear by writing 1 */
+	}
 }
 
 /* ------------------------------------------------------------------------ */
@@ -178,7 +229,7 @@ LOCAL INT can1_poll_recv(void)
 
 	while ((in_w(FDCAN_RXF0S) & 0x7Fu) != 0) {		/* F0FL: fill level */
 		UW gidx = (in_w(FDCAN_RXF0S) >> 8) & 0x3Fu;	/* F0GI: get index  */
-		UW elem = SRAMCAN_BASE_ADDR + SRAMCAN_RXF0_OFFSET + gidx * 16u;
+		UW elem = SRAMCAN_BASE_ADDR + SRAMCAN_RXF0_OFFSET + gidx * CAN_ELEMENT_SIZE;
 
 		UW r0  = in_w(elem + 0x00u);
 		UW r1  = in_w(elem + 0x04u);
@@ -195,15 +246,17 @@ LOCAL INT can1_poll_recv(void)
 					  : (UB)(w1 >> (8 * (i - 4)));
 		}
 
+		/* Release the hardware FIFO element BEFORE the slow tm_printf so   */
+		/* the slot is available again as quickly as possible. The frame    */
+		/* has already been copied into local storage above.                */
+		out_w(FDCAN_RXF0A, gidx);
+		n++;
+
 		tm_printf((UB*)"CAN RX: ID=0x%x DLC=%d data=", id, dlc);
 		for (i = 0; i < dlc; i++) {
 			tm_printf((UB*)"%x ", data[i]);
 		}
 		tm_printf((UB*)"\n");
-
-		/* Acknowledge / release this FIFO element */
-		out_w(FDCAN_RXF0A, gidx);
-		n++;
 	}
 	return n;
 }
@@ -288,16 +341,20 @@ LOCAL void task_can(INT stacd, void *exinf)
 
 	while(1) {
 		can1_poll_recv();
+		can1_check_rx_overflow();	/* warn if RX FIFO0 dropped frames */
 
-		if ((tick % 20) == 0) {		/* 20 * 50ms = ~1s */
+		if ((tick % 200) == 0) {	/* 200 * 5ms = ~1s */
 			tx[0]++;		/* vary payload so frames are distinguishable */
-			can1_send(CAN_TEST_ID, tx, 8);
-			tm_printf((UB*)"CAN TX: ID=0x%x\n", CAN_TEST_ID);
+			if (can1_send(CAN_TEST_ID, tx, 8)) {
+				tm_printf((UB*)"CAN TX: ID=0x%x queued\n", CAN_TEST_ID);
+			} else {
+				tm_printf((UB*)"CAN TX: ID=0x%x FIFO FULL\n", CAN_TEST_ID);
+			}
 			can1_print_status();	/* dump LEC / bus-state / TEC-REC */
 		}
 
 		tick++;
-		tk_dly_tsk(50);
+		tk_dly_tsk(5);			/* poll RX ~every 5ms (was 50ms) */
 	}
 }
 
