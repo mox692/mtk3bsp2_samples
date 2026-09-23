@@ -80,7 +80,7 @@ struct can_device {
 /*  Backend ops tables (defined by the hw backends, referenced by board).   */
 /* ------------------------------------------------------------------------ */
 extern const can_hw_ops_t can_hw_stm32h5_fdcan_ops;	/* STM32H5 (H533) */
-/* extern const can_hw_ops_t can_hw_stm32h7_fdcan_ops; */ /* added in Phase 2 */
+extern const can_hw_ops_t can_hw_stm32h7_fdcan_ops;	/* STM32H7 (H723) */
 
 #ifdef __cplusplus
 }

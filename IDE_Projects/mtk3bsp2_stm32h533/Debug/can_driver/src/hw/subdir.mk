@@ -5,23 +5,28 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
-/Users/motoyuki.kimura/work/tron_play/mtk3bsp2_samples/Components/can/src/hw/stm32h5_fdcan.c 
+/Users/motoyuki.kimura/work/tron_play/mtk3bsp2_samples/Components/can/src/hw/stm32h5_fdcan.c \
+/Users/motoyuki.kimura/work/tron_play/mtk3bsp2_samples/Components/can/src/hw/stm32h7_fdcan.c 
 
 OBJS += \
-./can_driver/src/hw/stm32h5_fdcan.o 
+./can_driver/src/hw/stm32h5_fdcan.o \
+./can_driver/src/hw/stm32h7_fdcan.o 
 
 C_DEPS += \
-./can_driver/src/hw/stm32h5_fdcan.d 
+./can_driver/src/hw/stm32h5_fdcan.d \
+./can_driver/src/hw/stm32h7_fdcan.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes
 can_driver/src/hw/stm32h5_fdcan.o: /Users/motoyuki.kimura/work/tron_play/mtk3bsp2_samples/Components/can/src/hw/stm32h5_fdcan.c can_driver/src/hw/subdir.mk
 	arm-none-eabi-gcc "$<" -mcpu=cortex-m33 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32H533xx -D_STM32CUBE_NUCLEO_H533_ -c -I../Core/Inc -I../Drivers/STM32H5xx_HAL_Driver/Inc -I../Drivers/STM32H5xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32H5xx/Include -I../Drivers/CMSIS/Include -I"/Users/motoyuki.kimura/work/tron_play/mtk3bsp2_samples/IDE_Projects/mtk3bsp2_stm32h533/mtk3_bsp2" -I"/Users/motoyuki.kimura/work/tron_play/mtk3bsp2_samples/IDE_Projects/mtk3bsp2_stm32h533/mtk3_bsp2/config" -I"/Users/motoyuki.kimura/work/tron_play/mtk3bsp2_samples/IDE_Projects/mtk3bsp2_stm32h533/mtk3_bsp2/include" -I"/Users/motoyuki.kimura/work/tron_play/mtk3bsp2_samples/IDE_Projects/mtk3bsp2_stm32h533/mtk3_bsp2/mtkernel/kernel/knlinc" -I"/Users/motoyuki.kimura/work/tron_play/mtk3bsp2_samples/Components/can/include" -I"/Users/motoyuki.kimura/work/tron_play/mtk3bsp2_samples/Components/can/src" -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"$(@:%.o=%.d)" -MT"$@" --specs=nano.specs -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb -o "$@"
+can_driver/src/hw/stm32h7_fdcan.o: /Users/motoyuki.kimura/work/tron_play/mtk3bsp2_samples/Components/can/src/hw/stm32h7_fdcan.c can_driver/src/hw/subdir.mk
+	arm-none-eabi-gcc "$<" -mcpu=cortex-m33 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32H533xx -D_STM32CUBE_NUCLEO_H533_ -c -I../Core/Inc -I../Drivers/STM32H5xx_HAL_Driver/Inc -I../Drivers/STM32H5xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32H5xx/Include -I../Drivers/CMSIS/Include -I"/Users/motoyuki.kimura/work/tron_play/mtk3bsp2_samples/IDE_Projects/mtk3bsp2_stm32h533/mtk3_bsp2" -I"/Users/motoyuki.kimura/work/tron_play/mtk3bsp2_samples/IDE_Projects/mtk3bsp2_stm32h533/mtk3_bsp2/config" -I"/Users/motoyuki.kimura/work/tron_play/mtk3bsp2_samples/IDE_Projects/mtk3bsp2_stm32h533/mtk3_bsp2/include" -I"/Users/motoyuki.kimura/work/tron_play/mtk3bsp2_samples/IDE_Projects/mtk3bsp2_stm32h533/mtk3_bsp2/mtkernel/kernel/knlinc" -I"/Users/motoyuki.kimura/work/tron_play/mtk3bsp2_samples/Components/can/include" -I"/Users/motoyuki.kimura/work/tron_play/mtk3bsp2_samples/Components/can/src" -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"$(@:%.o=%.d)" -MT"$@" --specs=nano.specs -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb -o "$@"
 
 clean: clean-can_driver-2f-src-2f-hw
 
 clean-can_driver-2f-src-2f-hw:
-	-$(RM) ./can_driver/src/hw/stm32h5_fdcan.cyclo ./can_driver/src/hw/stm32h5_fdcan.d ./can_driver/src/hw/stm32h5_fdcan.o ./can_driver/src/hw/stm32h5_fdcan.su
+	-$(RM) ./can_driver/src/hw/stm32h5_fdcan.cyclo ./can_driver/src/hw/stm32h5_fdcan.d ./can_driver/src/hw/stm32h5_fdcan.o ./can_driver/src/hw/stm32h5_fdcan.su ./can_driver/src/hw/stm32h7_fdcan.cyclo ./can_driver/src/hw/stm32h7_fdcan.d ./can_driver/src/hw/stm32h7_fdcan.o ./can_driver/src/hw/stm32h7_fdcan.su
 
 .PHONY: clean-can_driver-2f-src-2f-hw
 
